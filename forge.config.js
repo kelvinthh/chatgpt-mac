@@ -4,17 +4,17 @@ module.exports = {
     name: "ChatGPT",
     executableName: "ChatGPT",
     icon: "images/icon",
-    appBundleId: "com.vincelwt.chatgptmac",
+    appBundleId: "com.kelvinthh.chatgptmac",
     extendInfo: {
       LSUIElement: "true",
     },
     osxSign: {
       hardenedRuntime: false,
       gatekeeperAssess: false,
-      identity: "Developer ID Application: Lyser.io Ltd (R4PF6TTR6Z)",
+      identity: "", // To be filled
     },
     osxNotarize: {
-      appBundleId: "com.vincelwt.chatgptmac",
+      appBundleId: "com.kelvinthh.chatgptmac",
 
       tool: "notarytool",
       appleId: parsed.APPLE_ID,
@@ -27,7 +27,7 @@ module.exports = {
       name: "@electron-forge/publisher-github",
       config: {
         repository: {
-          owner: "vincelwt",
+          owner: "kelvinthh",
           name: "chatgpt-mac",
         },
         prerelease: true,

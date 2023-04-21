@@ -1,9 +1,4 @@
-require("update-electron-app")();
-
 const { menubar } = require("menubar");
-const Nucleus = require("nucleus-analytics");
-
-const path = require("path");
 const {
   app,
   nativeImage,
@@ -13,23 +8,23 @@ const {
   shell,
 } = require("electron");
 const contextMenu = require("electron-context-menu");
+const path = require("path");
 
-const image = nativeImage.createFromPath(
-  path.join(__dirname, `images/newiconTemplate.png`)
-);
-
+// When app is ready, set up the menubar and context menu
 app.on("ready", () => {
-  Nucleus.init("638d9ccf4a5ed2dae43ce122");
-
+  // Create Tray object using the menubar icon image
+  const image = nativeImage.createFromPath(
+    path.join(__dirname, `images/newiconTemplate.png`)
+  );
   const tray = new Tray(image);
 
+  // Set up menubar object
   const mb = menubar({
     browserWindow: {
       icon: image,
       transparent: path.join(__dirname, `images/iconApp.png`),
       webPreferences: {
         webviewTag: true,
-        // nativeWindowOpen: true,
       },
       width: 450,
       height: 550,
@@ -41,18 +36,21 @@ app.on("ready", () => {
     icon: image,
   });
 
+  // When menubar is ready, set up its behavior
   mb.on("ready", () => {
+    // Get a reference to the menubar window
     const { window } = mb;
 
-
+    // Hide the window from the taskbar on Windows and Linux
     if (process.platform !== "darwin") {
       window.setSkipTaskbar(true);
     } else {
+      // Hide the dock icon on macOS
       app.dock.hide();
     }
 
+    // Set up the context menu items
     const contextMenuTemplate = [
-      // add links to github repo and vince's twitter
       {
         label: "Quit",
         accelerator: "Command+Q",
@@ -79,29 +77,30 @@ app.on("ready", () => {
       {
         label: "View on GitHub",
         click: () => {
-          shell.openExternal("https://github.com/vincelwt/chatgpt-mac");
+          shell.openExternal("https://github.com/kelvinthh/chatgpt-mac");
         },
       },
-      {
-        label: "Author on Twitter",
-        click: () => {
-          shell.openExternal("https://twitter.com/vincelwt");
-        },
-      },
+      // {
+      //   label: "Author on Twitter",
+      //   click: () => {
+      //     shell.openExternal("https://twitter.com/vincelwt");
+      //   },
+      // },
     ];
 
+    // Set up the tray context menu behavior
     tray.on("right-click", () => {
       mb.tray.popUpContextMenu(Menu.buildFromTemplate(contextMenuTemplate));
     });
 
     tray.on("click", (e) => {
-      //check if ctrl or meta key is pressed while clicking
+      // Check if ctrl or meta key is pressed while clicking
       e.ctrlKey || e.metaKey
         ? mb.tray.popUpContextMenu(Menu.buildFromTemplate(contextMenuTemplate))
         : null;
     });
-    const menu = new Menu();
 
+    // Set up the global shortcut to show/hide the menubar window
     globalShortcut.register("CommandOrControl+Shift+g", () => {
       if (window.isVisible()) {
         mb.hideWindow();
@@ -114,67 +113,57 @@ app.on("ready", () => {
       }
     });
 
+    // Set up the application menu
+    const menu = new Menu();
     Menu.setApplicationMenu(menu);
 
-    // open devtools
-    // window.webContents.openDevTools();
+    // Set up web contents event listener for webview tag
+    app.on("web-contents-created", (e, contents) => {
+      if (contents.getType() == "webview") {
+        // Open links with external browser in webview
+        contents.on("new-window", (e, url) => {
+          e.preventDefault();
+          shell.openExternal(url);
+        });
+
+        // Set context menu in webview
+        contextMenu({
+          window: contents,
+        });
+
+        // Register cmd+c/cmd+v events
+        contents.on("before-input-event", (event, input) => {
+          const { control, meta, key } = input;
+          if (!control && !meta) return;
+          if (key === "c") contents.copy();
+          if (key === "v") contents.paste();
+          if (key === "a") contents.selectAll();
+          if (key === "z") contents.undo();
+          if (key === "y") contents.redo();
+          if (key === "q") app.quit();
+          if (key === "r") contents.reload();
+        });
+      }
+    });
+
+    // Restore focus to previous app on hiding
+    if (process.platform == "darwin") {
+      mb.on("after-hide", () => {
+        mb.app.hide();
+      });
+    }
+
+    // Prevent background flickering
+    app.commandLine.appendSwitch(
+      "disable-backgrounding-occluded-windows",
+      "true"
+    );
 
     console.log("Menubar app is ready.");
   });
-
-  app.on("web-contents-created", (e, contents) => {
-    if (contents.getType() == "webview") {
-      // open link with external browser in webview
-      contents.on("new-window", (e, url) => {
-        e.preventDefault();
-        shell.openExternal(url);
-      });
-      // set context menu in webview
-      contextMenu({
-        window: contents,
-      });
-
-      // we can't set the native app menu with "menubar" so need to manually register these events
-      // register cmd+c/cmd+v events
-      contents.on("before-input-event", (event, input) => {
-        const { control, meta, key } = input;
-        if (!control && !meta) return;
-        if (key === "c") contents.copy();
-        if (key === "v") contents.paste();
-        if (key === "a") contents.selectAll();
-        if (key === "z") contents.undo();
-        if (key === "y") contents.redo();
-        if (key === "q") app.quit();
-        if (key === "r") contents.reload();
-      });
-    }
-  });
-
-  if (process.platform == "darwin") {
-    // restore focus to previous app on hiding
-    mb.on("after-hide", () => {
-      mb.app.hide();
-    });
-  }
-
-  // open links in new window
-  // app.on("web-contents-created", (event, contents) => {
-  //   contents.on("will-navigate", (event, navigationUrl) => {
-  //     event.preventDefault();
-  //     shell.openExternal(navigationUrl);
-  //   });
-  // });
-
-  // prevent background flickering
-  app.commandLine.appendSwitch(
-    "disable-backgrounding-occluded-windows",
-    "true"
-  );
 });
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// Quit when all windows are closed, except on macOS
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
