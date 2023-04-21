@@ -10,15 +10,80 @@ const {
 const contextMenu = require("electron-context-menu");
 const path = require("path");
 
-// When app is ready, set up the menubar and context menu
-app.on("ready", () => {
-  // Create Tray object using the menubar icon image
+// Create Tray object using the menubar icon image
+async function createTray() {
   const image = nativeImage.createFromPath(
     path.join(__dirname, `images/newiconTemplate.png`)
   );
   const tray = new Tray(image);
 
-  // Set up menubar object
+  return { tray, image };
+}
+
+// Set up the context menu items and behavior
+function createContextMenu(tray, window) {
+  const contextMenuTemplate = [
+    {
+      label: "Quit",
+      accelerator: "Command+Q",
+      click: () => {
+        app.quit();
+      },
+    },
+    {
+      label: "Reload",
+      accelerator: "Command+R",
+      click: () => {
+        window.reload();
+      },
+    },
+    {
+      label: "Open in browser",
+      click: () => {
+        shell.openExternal("https://chat.openai.com/chat");
+      },
+    },
+    {
+      type: "separator",
+    },
+    {
+      label: "View on GitHub",
+      click: () => {
+        shell.openExternal("https://github.com/kelvinthh/chatgpt-mac");
+      },
+    },
+  ];
+
+  // Set up the tray context menu behavior
+  tray.on("right-click", () => {
+    tray.popUpContextMenu(Menu.buildFromTemplate(contextMenuTemplate));
+  });
+
+  tray.on("click", (e) => {
+    e.ctrlKey || e.metaKey
+      ? tray.popUpContextMenu(Menu.buildFromTemplate(contextMenuTemplate))
+      : null;
+  });
+}
+
+// Register the global shortcut to show/hide the menubar window
+function registerGlobalShortcut(window) {
+  globalShortcut.register("CommandOrControl+Shift+g", () => {
+    if (window.isVisible()) {
+      window.hide();
+    } else {
+      window.show();
+      if (process.platform == "darwin") {
+        app.show();
+      }
+      app.focus();
+    }
+  });
+}
+
+app.on("ready", async () => {
+  const { tray, image } = await createTray();
+
   const mb = menubar({
     browserWindow: {
       icon: image,
@@ -36,82 +101,18 @@ app.on("ready", () => {
     icon: image,
   });
 
-  // When menubar is ready, set up its behavior
   mb.on("ready", () => {
-    // Get a reference to the menubar window
     const { window } = mb;
 
-    // Hide the window from the taskbar on Windows and Linux
+    // Your setup code goes here
     if (process.platform !== "darwin") {
       window.setSkipTaskbar(true);
     } else {
-      // Hide the dock icon on macOS
       app.dock.hide();
     }
 
-    // Set up the context menu items
-    const contextMenuTemplate = [
-      {
-        label: "Quit",
-        accelerator: "Command+Q",
-        click: () => {
-          app.quit();
-        },
-      },
-      {
-        label: "Reload",
-        accelerator: "Command+R",
-        click: () => {
-          window.reload();
-        },
-      },
-      {
-        label: "Open in browser",
-        click: () => {
-          shell.openExternal("https://chat.openai.com/chat");
-        },
-      },
-      {
-        type: "separator",
-      },
-      {
-        label: "View on GitHub",
-        click: () => {
-          shell.openExternal("https://github.com/kelvinthh/chatgpt-mac");
-        },
-      },
-      // {
-      //   label: "Author on Twitter",
-      //   click: () => {
-      //     shell.openExternal("https://twitter.com/vincelwt");
-      //   },
-      // },
-    ];
-
-    // Set up the tray context menu behavior
-    tray.on("right-click", () => {
-      mb.tray.popUpContextMenu(Menu.buildFromTemplate(contextMenuTemplate));
-    });
-
-    tray.on("click", (e) => {
-      // Check if ctrl or meta key is pressed while clicking
-      e.ctrlKey || e.metaKey
-        ? mb.tray.popUpContextMenu(Menu.buildFromTemplate(contextMenuTemplate))
-        : null;
-    });
-
-    // Set up the global shortcut to show/hide the menubar window
-    globalShortcut.register("CommandOrControl+Shift+g", () => {
-      if (window.isVisible()) {
-        mb.hideWindow();
-      } else {
-        mb.showWindow();
-        if (process.platform == "darwin") {
-          mb.app.show();
-        }
-        mb.app.focus();
-      }
-    });
+    createContextMenu(tray, window);
+    registerGlobalShortcut(window);
 
     // Set up the application menu
     const menu = new Menu();
